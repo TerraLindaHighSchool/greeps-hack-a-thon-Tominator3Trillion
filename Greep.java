@@ -9,6 +9,7 @@ import greenfoot.*;
 public class Greep extends Creature
 {
     private static final double WALKING_SPEED = 5.0;
+    private final int[] SHIP_COORDS;
     
     // Remember: you cannot extend the Greep's memory. So:
     // no additional fields (other than final fields) allowed in this class!
@@ -27,6 +28,7 @@ public class Greep extends Creature
     public Greep(Ship ship)
     {
         super(ship);
+        SHIP_COORDS= new int[]{ship.getX(), ship.getY()};
         setRotation(0);
     }
     
@@ -37,8 +39,8 @@ public class Greep extends Creature
             x = (int) Math.round(getX() + Math.cos(angle) * WALKING_SPEED*15);
             y = (int) Math.round(getY() + Math.sin(angle) * WALKING_SPEED*15);
         } else {
-            x = (int) Math.round(getX() + Math.cos(angle) * WALKING_SPEED*(10 +Greenfoot.getRandomNumber(5)));
-            y = (int) Math.round(getY() + Math.sin(angle) * WALKING_SPEED*(10 +Greenfoot.getRandomNumber(5)));
+            x = (int) Math.round(getX() + Math.cos(angle) * WALKING_SPEED*(5 +Greenfoot.getRandomNumber(15)));
+            y = (int) Math.round(getY() + Math.sin(angle) * WALKING_SPEED*(5 +Greenfoot.getRandomNumber(15)));
         }
         
         // now make sure that we are not stepping out of the world
@@ -63,6 +65,22 @@ public class Greep extends Creature
     }
     public int getCell() {
         return (int)getY() / 45  * getWorld().getWidth()/45 + getX() / 45;
+    }
+    
+    public boolean inCellOfMemory() {
+        int[] cim = cellOfCherryInMemory();
+        int dX = Math.abs(cim[0]- getX());
+        int dY = Math.abs(cim[1] - getY());
+        return dX < 50 && dY < 50;
+        
+    }
+    
+    public int[] cellCoords() {
+        int[] cim = cellOfCherryInMemory();
+        int dX = Math.abs(cim[0]- getX());
+        int dY = Math.abs(cim[1] - getY());
+        return new int[] {dX, dY};
+        
     }
     
 
@@ -90,49 +108,97 @@ public class Greep extends Creature
             }
         }
         else {
+            if(seePaint("red")) {
+                setMemory(0);
+            }
+            
             //turn(Greenfoot.getRandomNumber(10)-5);
+            int turns = 0;
+            int wentOtherway = 30;
             while(inFrontOfWater()) {
-                turn(40+ Greenfoot.getRandomNumber(10));
+                turn(wentOtherway);
+                turns+= wentOtherway;
+                if(turns >= 70) {
+                    wentOtherway = -30;
+                } else if (turns <= -70) {
+                    setFlag(1, false);
+                    setFlag(2, true);
+                    setMemory(getCell());
+                }
             }
             if(isAtEdge() || atWater()) {
                     turn(20 + Greenfoot.getRandomNumber(30));
             }
             //memory is what direction purple was tasted last
             
-            if(seePaint("purple")) {
-                if(getMemory() > 18) {
-                    turnToMemory();
-                    while(inFrontOfWater()) {
-                        turn(45);
+            
+            if(getMemory() > 18 && getFlag(1) && !getFlag(2)) {
+                    if(!inCellOfMemory()) {
+                        turnToMemory();
+                        while(inFrontOfWater()) {
+                            turn(45);
+                        }
+                        if(isAtEdge() || atWater()) {
+                            turn(90);
+                        }
+                    } else {
+                        System.out.println("Here");
+                        while(inFrontOfWater()) {
+                            turn(40+ Greenfoot.getRandomNumber(10));
+                        }
+                        if(isAtEdge() || atWater()) {
+                            turn(20 + Greenfoot.getRandomNumber(30));
+                        }
                     }
-                    if(isAtEdge() || atWater()) {
-                        turn(90);
+                    
+                    if(getOneIntersectingObject(TomatoPile.class) == null) {
+                        move();
+                    } else {
+                        System.out.println("Tomato");
                     }
+                    if(!seePaint("purple") || seePaint("red")) {
+                        setMemory(0);
+                    }
+                        
+                } else if(getMemory() > 18 && getFlag(2) && !getFlag(1)) {
+                    if(!inCellOfMemory()) {
+                        if(!(cellCoords()[0] < 50) || !(cellCoords()[1] < 50) && (SHIP_COORDS[0] > 150 || SHIP_COORDS[1] > 150)) {
+                            turnToMemory();
+                            if(!(getFlag(1) && getFlag(2))) {
+                                turn(180);
+                            }
+                            setFlag(1, true);
+                            setFlag(2, true);
+                            spit("orange");
+                        }
+                        while(inFrontOfWater()) {
+                            turn(15 + Greenfoot.getRandomNumber(30));
+                        }
+                        if(isAtEdge() || atWater()) {
+                            turn(90);
+                        }
+                    }
+                }
+            
+                if(seePaint("purple") && !seePaint("red")) {
+                    setMemory(getCell());
+                }
+                if(seePaint("orange")) {
+                    
+                            if(!(getFlag(1) && getFlag(2))) {
+                                turnToMemory();
+                                turn(180);
+                            }
+                            setFlag(1, true);
+                            setFlag(2, true);
+                } else {
+                    setFlag(1, false);
+                            setFlag(2, false);
+                }
+                
+                if((TomatoPile) getOneIntersectingObject(TomatoPile.class) == null || carryingTomato()) {
                     move();
                 }
-                /*
-                switch(getMemory()) {
-                    case 0:
-                        setMemory(1);
-                        break;
-                    default:
-                        setRotation((getMemory()-1)*20);
-                        move();
-                        setMemory(getMemory()); //increments of 20
-                        if(!seePaint("purple")) {
-                            turn(180);
-                            setMemory(getMemory()+1);
-                            if(getMemory() > 18) {
-                                setMemory(0);
-                            }
-                        }
-                        break;
-                }
-                */
-                
-                
-            }
-            
             
             move();
             checkFood();
@@ -149,9 +215,17 @@ public class Greep extends Creature
         if (tomatoes != null) {
             loadTomato();
             setMemory(0);
-            spit("purple");
-            setMemory(getCell());
+            
+            
             setRotation(80);
+            if(getOneIntersectingObject(TomatoPile.class) == null) {
+                spit("red");
+            } else {
+                spit("purple");
+                setMemory(getCell());
+                setFlag(1, true);
+                setFlag(2, false);
+            }
             
             
             
